@@ -38,7 +38,7 @@ Dirancang dan dikelola secara independen oleh **[Hidaka](https://github.com/Hida
 
 ## 1. Gambaran Umum & Arsitektur
 
-**Alight Motion Premium Creator** adalah aplikasi web berbasis **Server-Side Rendering (SSR)** yang dibangun menggunakan **React 19** dan **TanStack Start (Vite + Nitro)**. Aplikasi ini bertindak sebagai antarmuka pengguna (*frontend gateway*) yang menjembatani pengguna akhir dengan layanan backend API aktivasi (`https://am-premium-nimzz.vercel.app`) melalui *Server Functions* terisolasi.
+**Alight Motion Premium Creator** adalah aplikasi web berbasis **Server-Side Rendering (SSR)** yang dibangun menggunakan **React 19** dan **TanStack Start (Vite + Nitro)**. Aplikasi ini bertindak sebagai antarmuka pengguna (*frontend gateway*) yang menjembatani pengguna akhir dengan layanan backend API aktivasi (`https://am-premiumms.ai.studio`) melalui *Server Functions* terisolasi.
 
 ```
 ┌──────────────────────┐       RPC / ServerFn        ┌──────────────────────────┐       HTTPS / JSON        ┌──────────────────────────┐
@@ -208,7 +208,7 @@ Buat file `.env` di direktori akar (*root*) atau atur langsung pada panel *Envir
 
 ```dotenv
 # URL API Backend Aktivasi (Opsional — memiliki fallback default ke server utama)
-VITE_API_BASE_URL=https://am-premium-nimzz.vercel.app
+VITE_API_BASE_URL=https://am-premiumms.ai.studio
 ```
 
 | Nama Variabel | Sifat | Wajib? | Keterangan |
