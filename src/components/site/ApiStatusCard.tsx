@@ -27,24 +27,55 @@ export function ApiStatusCard() {
 
       {online ? (
         <dl className="mt-5 divide-y divide-border/70 text-sm">
-          <div className="flex items-center justify-between py-2.5">
-            <dt className="flex items-center gap-2 text-muted-foreground">
-              <i className="fa-solid fa-code-commit w-4 text-center text-xs" aria-hidden="true" />
-              <span>Version</span>
-            </dt>
-            <dd className="font-mono font-medium text-foreground tabular-nums">
-              {data?.version ?? "—"}
-            </dd>
-          </div>
-          <div className="flex items-center justify-between py-2.5">
-            <dt className="flex items-center gap-2 text-muted-foreground">
-              <i className="fa-regular fa-clock w-4 text-center text-xs" aria-hidden="true" />
-              <span>Uptime</span>
-            </dt>
-            <dd className="font-mono font-medium text-foreground tabular-nums">
-              {formatUptime(data?.uptime)}
-            </dd>
-          </div>
+          {data?.version || typeof data?.uptime === "number" ? (
+            <>
+              <div className="flex items-center justify-between py-2.5">
+                <dt className="flex items-center gap-2 text-muted-foreground">
+                  <i
+                    className="fa-solid fa-code-commit w-4 text-center text-xs"
+                    aria-hidden="true"
+                  />
+                  <span>Version</span>
+                </dt>
+                <dd className="font-mono font-medium text-foreground tabular-nums">
+                  {data?.version ?? "—"}
+                </dd>
+              </div>
+              <div className="flex items-center justify-between py-2.5">
+                <dt className="flex items-center gap-2 text-muted-foreground">
+                  <i className="fa-regular fa-clock w-4 text-center text-xs" aria-hidden="true" />
+                  <span>Uptime</span>
+                </dt>
+                <dd className="font-mono font-medium text-foreground tabular-nums">
+                  {formatUptime(data?.uptime)}
+                </dd>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="flex items-center justify-between py-2.5">
+                <dt className="flex items-center gap-2 text-muted-foreground">
+                  <i className="fa-solid fa-users w-4 text-center text-xs" aria-hidden="true" />
+                  <span>Total aktivasi</span>
+                </dt>
+                <dd className="font-mono font-medium text-foreground tabular-nums">
+                  {typeof data?.total === "number" ? data.total.toLocaleString("id-ID") : "—"}
+                </dd>
+              </div>
+              <div className="flex items-center justify-between py-2.5">
+                <dt className="flex items-center gap-2 text-muted-foreground">
+                  <i
+                    className="fa-regular fa-calendar w-4 text-center text-xs"
+                    aria-hidden="true"
+                  />
+                  <span>Aktivasi hari ini</span>
+                </dt>
+                <dd className="font-mono font-medium text-foreground tabular-nums">
+                  {typeof data?.today === "number" ? data.today.toLocaleString("id-ID") : "—"}
+                </dd>
+              </div>
+            </>
+          )}
           <div className="flex items-center justify-between py-2.5">
             <dt className="flex items-center gap-2 text-muted-foreground">
               <i className="fa-solid fa-stopwatch w-4 text-center text-xs" aria-hidden="true" />
