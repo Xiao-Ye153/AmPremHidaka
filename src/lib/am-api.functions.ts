@@ -122,7 +122,11 @@ export const getHealth = createServerFn({ method: "GET" }).handler(
     if (!result || result.status >= 400) return { online: false, checkedAt };
     const payload = result.payload;
     return {
-      online: payload["status"] === "online" || payload["status"] === true,
+      online:
+        payload["status"] === "online" ||
+        payload["status"] === true ||
+        payload["success"] === true ||
+        typeof payload["total"] !== "undefined",
       version: typeof payload["version"] === "string" ? payload["version"] : undefined,
       uptime: typeof payload["uptime"] === "number" ? payload["uptime"] : undefined,
       ts: typeof payload["ts"] === "string" ? payload["ts"] : undefined,
@@ -132,6 +136,7 @@ export const getHealth = createServerFn({ method: "GET" }).handler(
 );
 
 export const getInfo = createServerFn({ method: "GET" }).handler(async (): Promise<InfoResult> => {
+  if (!API_ENDPOINTS.info) return { ok: false };
   const result = await callApi(API_ENDPOINTS.info);
   if (!result || result.status >= 400) return { ok: false };
   const payload = result.payload;
@@ -165,7 +170,11 @@ export const sendMagicLink = createServerFn({ method: "POST" })
     if (!result) {
       return { ok: false, code: "API_OFFLINE", message: errorMessageFor("API_OFFLINE") };
     }
-    if (result.status >= 400 || result.payload["status"] === false) {
+    if (
+      result.status >= 400 ||
+      result.payload["status"] === false ||
+      result.payload["success"] === false
+    ) {
       return readableError(result.payload, result.status);
     }
     return {
@@ -193,13 +202,20 @@ export const verifyMagicLink = createServerFn({ method: "POST" })
     if (!result) {
       return { ok: false, code: "API_OFFLINE", message: errorMessageFor("API_OFFLINE") };
     }
-    if (result.status >= 400 || result.payload["status"] === false) {
+    if (
+      result.status >= 400 ||
+      result.payload["status"] === false ||
+      result.payload["success"] === false
+    ) {
       return readableError(result.payload, result.status);
     }
 
     const payload = result.payload;
     // API asli membungkus data di payload.result: { user: {...}, premium: {...} }
-    const nested = (payload["data"] ?? payload["result"] ?? {}) as Record<string, unknown>;
+    const nested = (payload["data"] ?? payload["userData"] ?? payload["result"] ?? {}) as Record<
+      string,
+      unknown
+    >;
     const userObj = (nested["user"] ?? {}) as Record<string, unknown>;
     const premiumObj = (nested["premium"] ?? nested) as Record<string, unknown>;
     const plan = (premiumObj["plan"] ?? payload["plan"] ?? nested["plan"] ?? {}) as
