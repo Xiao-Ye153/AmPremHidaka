@@ -1,13 +1,15 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
-import { API_BASE_URL, API_ENDPOINTS } from "@/config/api";
+import { API_BASE_URL, API_ENDPOINTS, PLAN_FALLBACK } from "@/config/api";
 
 export type HealthResult = {
   online: boolean;
   version?: string | undefined;
   uptime?: number | undefined;
   ts?: string | undefined;
+  total?: number | undefined;
+  today?: number | undefined;
   checkedAt: string;
 };
 
@@ -130,13 +132,25 @@ export const getHealth = createServerFn({ method: "GET" }).handler(
       version: typeof payload["version"] === "string" ? payload["version"] : undefined,
       uptime: typeof payload["uptime"] === "number" ? payload["uptime"] : undefined,
       ts: typeof payload["ts"] === "string" ? payload["ts"] : undefined,
+      total: Number.isFinite(Number(payload["total"])) ? Number(payload["total"]) : undefined,
+      today: Number.isFinite(Number(payload["today"])) ? Number(payload["today"]) : undefined,
       checkedAt,
     };
   },
 );
 
 export const getInfo = createServerFn({ method: "GET" }).handler(async (): Promise<InfoResult> => {
-  if (!API_ENDPOINTS.info) return { ok: false };
+  if (!API_ENDPOINTS.info) {
+    return {
+      ok: true,
+      plan: {
+        name: PLAN_FALLBACK.name,
+        type: PLAN_FALLBACK.type,
+        duration: PLAN_FALLBACK.duration,
+      },
+      benefits: PLAN_FALLBACK.benefits,
+    };
+  }
   const result = await callApi(API_ENDPOINTS.info);
   if (!result || result.status >= 400) return { ok: false };
   const payload = result.payload;
@@ -241,10 +255,12 @@ export const verifyMagicLink = createServerFn({ method: "POST" })
       email: pickString({ ...userObj, ...nested, ...payload }, ["email"]) ?? data.email,
       uid,
       orderId,
-      plan: pickString(planObject as Record<string, unknown>, ["name", "type"]),
+      plan:
+        pickString(planObject as Record<string, unknown>, ["name", "type"]) ?? PLAN_FALLBACK.name,
       duration:
         pickString(planObject as Record<string, unknown>, ["duration"]) ??
-        pickString({ ...premiumObj, ...nested, ...payload }, ["duration"]),
+        pickString({ ...premiumObj, ...nested, ...payload }, ["duration"]) ??
+        PLAN_FALLBACK.duration,
       validUntil: pickString({ ...premiumObj, ...nested, ...payload }, [
         "validUntil",
         "expiresAt",
@@ -252,7 +268,8 @@ export const verifyMagicLink = createServerFn({ method: "POST" })
         "expireAt",
         "until",
       ]),
-      benefits: benefits?.filter((b): b is string => typeof b === "string"),
+      benefits:
+        benefits?.filter((b): b is string => typeof b === "string") ?? PLAN_FALLBACK.benefits,
     };
 
     try {
