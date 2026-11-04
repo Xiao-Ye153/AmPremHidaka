@@ -8,8 +8,8 @@ export const siteConfig = {
   keywords:
     "alight motion premium, alight motion pro gratis, alight motion creator, aktivasi alight motion, magic link alight motion, am pro hidaka, alight motion premium hidaka, tutorial alight motion premium",
   author: "Hidaka",
-  authorUrl: "https://github.com/Hidaka-pemboy",
-  telegramHandle: "@Hidaka4",
+  authorUrl: "https://github.com/Xiao-Ye153",
+  instagramHandle: "@hidaka401",
   locale: "id_ID",
   language: "id",
   themeColor: "#f9f8f5",
@@ -70,7 +70,6 @@ export function buildPageSeo({
       { name: "twitter:description", content: description },
       { name: "twitter:image", content: imageUrl },
       { name: "twitter:image:alt", content: title },
-      { name: "twitter:creator", content: siteConfig.telegramHandle },
     ],
     links: [{ rel: "canonical", href: url }],
   };
