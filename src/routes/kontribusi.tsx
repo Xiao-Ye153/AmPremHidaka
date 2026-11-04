@@ -8,28 +8,28 @@ const description =
 
 const socialLinks = [
   {
-    label: "Saluran WhatsApp",
-    handle: "Update & Info Layanan",
+    label: "WhatsApp",
+    handle: "08138354970",
     icon: "fa-brands fa-whatsapp",
-    href: "https://whatsapp.com/channel/0029VbBhZWdGJP8HlbGaE63Q",
+    href: "https://wa.me/628138354970",
   },
   {
     label: "TikTok",
-    handle: "@hidaka_bocil_pokemon",
+    handle: "@alan.subagyo",
     icon: "fa-brands fa-tiktok",
-    href: "https://tiktok.com/@hidaka_bocil_pokemon",
+    href: "https://tiktok.com/@alan.subagyo",
   },
   {
-    label: "Telegram",
-    handle: "@Hidaka4",
-    icon: "fa-brands fa-telegram",
-    href: "https://t.me/Hidaka4",
+    label: "Instagram",
+    handle: "@hidaka401",
+    icon: "fa-brands fa-instagram",
+    href: "https://instagram.com/hidaka401",
   },
   {
     label: "GitHub",
-    handle: "Hidaka-pemboy",
+    handle: "Xiao-Ye153",
     icon: "fa-brands fa-github",
-    href: "https://github.com/Hidaka-pemboy",
+    href: "https://github.com/Xiao-Ye153",
   },
 ];
 
