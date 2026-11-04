@@ -5,7 +5,7 @@
 # Alight Motion Premium Creator
 
 **Platform utilitas web modern untuk aktivasi Alight Motion Premium (Pro) melalui verifikasi Magic Link secara instan.**  
-Dirancang dan dikelola secara independen oleh **[Hidaka](https://github.com/Hidaka-pemboy)**.
+Dirancang dan dikelola secara independen oleh **[Hidaka](https://github.com/Xiao-Ye153)**.
 
 [![Production URL](https://img.shields.io/badge/Live_Website-alight--motion--premium--hidaka.web.id-254EDB?style=for-the-badge&logo=googlechrome&logoColor=white)](https://alight-motion-premium-hidaka.web.id/)
 [![React 19](https://img.shields.io/badge/React-19.2-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
@@ -281,6 +281,6 @@ export const siteConfig = {
 
 <div align="center">
 
-Dikembangkan dan dikelola oleh **[Hidaka](https://github.com/Hidaka-pemboy)** · [Website Resmi](https://alight-motion-premium-hidaka.web.id/) · [Telegram](https://t.me/Hidaka4)
+Dikembangkan dan dikelola oleh **[Hidaka](https://github.com/Xiao-Ye153)** · [Website Resmi](https://alight-motion-premium-hidaka.web.id/) · [Instagram](https://instagram.com/hidaka401)
 
 </div>
