@@ -126,7 +126,6 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "twitter:description", content: siteConfig.description },
       { name: "twitter:image", content: absoluteUrl(siteConfig.ogImage) },
       { name: "twitter:image:alt", content: siteConfig.title },
-      { name: "twitter:creator", content: siteConfig.telegramHandle },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
@@ -169,10 +168,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
               url: absoluteUrl(siteConfig.logo),
             },
             sameAs: [
-              "https://github.com/Hidaka-pemboy",
-              "https://t.me/Hidaka4",
-              "https://tiktok.com/@hidaka_bocil_pokemon",
-              "https://whatsapp.com/channel/0029VbBhZWdGJP8HlbGaE63Q",
+              "https://github.com/Xiao-Ye153",
+              "https://instagram.com/hidaka401",
+              "https://tiktok.com/@alan.subagyo",
+              "https://wa.me/628138354970",
             ],
           },
         }),
