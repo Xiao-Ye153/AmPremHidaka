@@ -171,117 +171,122 @@ export const getInfo = createServerFn({ method: "GET" }).handler(async (): Promi
 
 const emailSchema = z.object({ email: z.string().trim().min(3).max(320) });
 
+export async function performSendMagicLink(data: { email: string }): Promise<ActionResult> {
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(data.email)) {
+    return { ok: false, code: "INVALID_EMAIL", message: errorMessageFor("INVALID_EMAIL") };
+  }
+  const result = await callApi(API_ENDPOINTS.sendLink, {
+    method: "POST",
+    body: JSON.stringify({ email: data.email }),
+  });
+  if (!result) {
+    return { ok: false, code: "API_OFFLINE", message: errorMessageFor("API_OFFLINE") };
+  }
+  if (
+    result.status >= 400 ||
+    result.payload["status"] === false ||
+    result.payload["success"] === false
+  ) {
+    return readableError(result.payload, result.status);
+  }
+  return {
+    ok: true,
+    message: "Link berhasil dikirim. Sekarang buka inbox email kamu.",
+    data: { email: data.email },
+  };
+}
+
 export const sendMagicLink = createServerFn({ method: "POST" })
   .validator((data: unknown) => emailSchema.parse(data))
-  .handler(async ({ data }): Promise<ActionResult> => {
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(data.email)) {
-      return { ok: false, code: "INVALID_EMAIL", message: errorMessageFor("INVALID_EMAIL") };
-    }
-    const result = await callApi(API_ENDPOINTS.sendLink, {
-      method: "POST",
-      body: JSON.stringify({ email: data.email }),
-    });
-    if (!result) {
-      return { ok: false, code: "API_OFFLINE", message: errorMessageFor("API_OFFLINE") };
-    }
-    if (
-      result.status >= 400 ||
-      result.payload["status"] === false ||
-      result.payload["success"] === false
-    ) {
-      return readableError(result.payload, result.status);
-    }
-    return {
-      ok: true,
-      message: "Link berhasil dikirim. Sekarang buka inbox email kamu.",
-      data: { email: data.email },
-    };
-  });
+  .handler(({ data }): Promise<ActionResult> => performSendMagicLink(data));
 
 const verifySchema = z.object({
   email: z.string().trim().min(3).max(320),
   magicLink: z.string().trim().min(10).max(4000),
 });
 
+export async function performVerifyMagicLink(data: {
+  email: string;
+  magicLink: string;
+}): Promise<ActionResult> {
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(data.email)) {
+    return { ok: false, code: "INVALID_EMAIL", message: errorMessageFor("INVALID_EMAIL") };
+  }
+  const result = await callApi(API_ENDPOINTS.verify, {
+    method: "POST",
+    body: JSON.stringify({ email: data.email, magicLink: data.magicLink }),
+  });
+  if (!result) {
+    return { ok: false, code: "API_OFFLINE", message: errorMessageFor("API_OFFLINE") };
+  }
+  if (
+    result.status >= 400 ||
+    result.payload["status"] === false ||
+    result.payload["success"] === false
+  ) {
+    return readableError(result.payload, result.status);
+  }
+
+  const payload = result.payload;
+  // API asli membungkus data di payload.result: { user: {...}, premium: {...} }
+  const nested = (payload["data"] ?? payload["userData"] ?? payload["result"] ?? {}) as Record<
+    string,
+    unknown
+  >;
+  const userObj = (nested["user"] ?? {}) as Record<string, unknown>;
+  const premiumObj = (nested["premium"] ?? nested) as Record<string, unknown>;
+  const plan = (premiumObj["plan"] ?? payload["plan"] ?? nested["plan"] ?? {}) as
+    Record<string, unknown> | string;
+  const planObject = typeof plan === "string" ? { name: plan } : plan;
+  const benefits = [premiumObj["benefits"], payload["benefits"], nested["benefits"]].find((value) =>
+    Array.isArray(value),
+  ) as unknown[] | undefined;
+
+  // uid dan orderId bukan kata sensitif (beda dari idToken/refreshToken),
+  // tapi diambil manual karena pickString() men-skip apa saja yang match /token|.../i
+  // dan "uid" / "orderId" kebetulan aman dari regex itu — tetap eksplisit biar jelas asalnya.
+  const uid =
+    typeof userObj["uid"] === "string" && userObj["uid"].trim() !== ""
+      ? userObj["uid"]
+      : pickString({ ...nested, ...payload }, ["uid"]);
+  const orderId =
+    typeof premiumObj["orderId"] === "string" && premiumObj["orderId"].trim() !== ""
+      ? premiumObj["orderId"]
+      : pickString({ ...nested, ...payload }, ["orderId", "order_id"]);
+
+  const verifiedData = {
+    email: pickString({ ...userObj, ...nested, ...payload }, ["email"]) ?? data.email,
+    uid,
+    orderId,
+    plan: pickString(planObject as Record<string, unknown>, ["name", "type"]) ?? PLAN_FALLBACK.name,
+    duration:
+      pickString(planObject as Record<string, unknown>, ["duration"]) ??
+      pickString({ ...premiumObj, ...nested, ...payload }, ["duration"]) ??
+      PLAN_FALLBACK.duration,
+    validUntil: pickString({ ...premiumObj, ...nested, ...payload }, [
+      "validUntil",
+      "expiresAt",
+      "expiry",
+      "expireAt",
+      "until",
+    ]),
+    benefits: benefits?.filter((b): b is string => typeof b === "string") ?? PLAN_FALLBACK.benefits,
+  };
+
+  try {
+    const { recordActivationTestimonial } = await import("@/lib/testimonials.functions");
+    recordActivationTestimonial(verifiedData);
+  } catch {
+    // non-blocking testimonial recording
+  }
+
+  return {
+    ok: true,
+    message: "Verifikasi berhasil.",
+    data: verifiedData,
+  };
+}
+
 export const verifyMagicLink = createServerFn({ method: "POST" })
   .validator((data: unknown) => verifySchema.parse(data))
-  .handler(async ({ data }): Promise<ActionResult> => {
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(data.email)) {
-      return { ok: false, code: "INVALID_EMAIL", message: errorMessageFor("INVALID_EMAIL") };
-    }
-    const result = await callApi(API_ENDPOINTS.verify, {
-      method: "POST",
-      body: JSON.stringify({ email: data.email, magicLink: data.magicLink }),
-    });
-    if (!result) {
-      return { ok: false, code: "API_OFFLINE", message: errorMessageFor("API_OFFLINE") };
-    }
-    if (
-      result.status >= 400 ||
-      result.payload["status"] === false ||
-      result.payload["success"] === false
-    ) {
-      return readableError(result.payload, result.status);
-    }
-
-    const payload = result.payload;
-    // API asli membungkus data di payload.result: { user: {...}, premium: {...} }
-    const nested = (payload["data"] ?? payload["userData"] ?? payload["result"] ?? {}) as Record<
-      string,
-      unknown
-    >;
-    const userObj = (nested["user"] ?? {}) as Record<string, unknown>;
-    const premiumObj = (nested["premium"] ?? nested) as Record<string, unknown>;
-    const plan = (premiumObj["plan"] ?? payload["plan"] ?? nested["plan"] ?? {}) as
-      Record<string, unknown> | string;
-    const planObject = typeof plan === "string" ? { name: plan } : plan;
-    const benefits = [premiumObj["benefits"], payload["benefits"], nested["benefits"]].find(
-      (value) => Array.isArray(value),
-    ) as unknown[] | undefined;
-
-    // uid dan orderId bukan kata sensitif (beda dari idToken/refreshToken),
-    // tapi diambil manual karena pickString() men-skip apa saja yang match /token|.../i
-    // dan "uid" / "orderId" kebetulan aman dari regex itu — tetap eksplisit biar jelas asalnya.
-    const uid =
-      typeof userObj["uid"] === "string" && userObj["uid"].trim() !== ""
-        ? userObj["uid"]
-        : pickString({ ...nested, ...payload }, ["uid"]);
-    const orderId =
-      typeof premiumObj["orderId"] === "string" && premiumObj["orderId"].trim() !== ""
-        ? premiumObj["orderId"]
-        : pickString({ ...nested, ...payload }, ["orderId", "order_id"]);
-
-    const verifiedData = {
-      email: pickString({ ...userObj, ...nested, ...payload }, ["email"]) ?? data.email,
-      uid,
-      orderId,
-      plan:
-        pickString(planObject as Record<string, unknown>, ["name", "type"]) ?? PLAN_FALLBACK.name,
-      duration:
-        pickString(planObject as Record<string, unknown>, ["duration"]) ??
-        pickString({ ...premiumObj, ...nested, ...payload }, ["duration"]) ??
-        PLAN_FALLBACK.duration,
-      validUntil: pickString({ ...premiumObj, ...nested, ...payload }, [
-        "validUntil",
-        "expiresAt",
-        "expiry",
-        "expireAt",
-        "until",
-      ]),
-      benefits:
-        benefits?.filter((b): b is string => typeof b === "string") ?? PLAN_FALLBACK.benefits,
-    };
-
-    try {
-      const { recordActivationTestimonial } = await import("@/lib/testimonials.functions");
-      recordActivationTestimonial(verifiedData);
-    } catch {
-      // non-blocking testimonial recording
-    }
-
-    return {
-      ok: true,
-      message: "Verifikasi berhasil.",
-      data: verifiedData,
-    };
-  });
+  .handler(({ data }): Promise<ActionResult> => performVerifyMagicLink(data));
