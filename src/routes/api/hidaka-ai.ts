@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 
 import { streamUnlimitedAI, type ChatMessage } from "@/lib/unlimitedai";
 import { siteConfig } from "@/config/site";
+import { performSendMagicLink, performVerifyMagicLink } from "@/lib/am-api.functions";
 
 const MAX_MESSAGE_LENGTH = 2000;
 const MAX_MESSAGES_IN_HISTORY = 40;
@@ -133,6 +134,116 @@ const jailbreakKeywords = [
   "aturan aslimu",
 ];
 
+const EMAIL_REGEX = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
+const URL_REGEX = /https?:\/\/[^\s<>"']+/i;
+
+function findEmail(text: string): string | undefined {
+  return text.match(EMAIL_REGEX)?.[0]?.toLowerCase();
+}
+
+// Magic link Firebase biasanya panjang dan membawa oobCode / apiKey.
+function findMagicLink(text: string): string | undefined {
+  const url = text.match(URL_REGEX)?.[0];
+  if (!url) return undefined;
+  return url.length >= 30 ? url : undefined;
+}
+
+// Link verifikasi bersifat sekali pakai & rahasia: jangan dikirim ke penyedia AI.
+function redactLinks(text: string): string {
+  return text.replace(new RegExp(URL_REGEX.source, "gi"), "[link disembunyikan]");
+}
+
+const ACTIVATION_INTENT =
+  /(aktif|activate|aktivasi|kirim(kan)?\s*link|minta\s*link|verifikasi|premium|pro)/i;
+
+async function handleActivationChat(
+  history: ChatMessage[],
+  clientId: string,
+): Promise<string | null> {
+  const last = history[history.length - 1];
+  if (!last || last.role !== "user") return null;
+  const text = last.content;
+
+  const magicLink = findMagicLink(text);
+  const emailInMessage = findEmail(text);
+
+  // Email diambil dari pesan ini, atau pesan user sebelumnya (setelah link dikirim).
+  let email = emailInMessage;
+  if (!email) {
+    for (let i = history.length - 2; i >= 0; i--) {
+      const m = history[i];
+      if (m?.role === "user") {
+        email = findEmail(m.content);
+        if (email) break;
+      }
+    }
+  }
+
+  // 1) User menempelkan magic link -> verifikasi
+  if (magicLink) {
+    if (!email) {
+      return "Link-nya sudah kuterima, tapi aku belum tahu email yang dipakai. Kirim dulu emailnya ya (email yang sama dengan yang dipakai buat minta link).";
+    }
+    if (!checkRateLimit(`ai-verify:${clientId}`, 5, 10 * 60 * 1000)) {
+      return "Percobaan verifikasinya kebanyakan nih. Tunggu beberapa menit dulu ya, lalu coba lagi.";
+    }
+    const result = await performVerifyMagicLink({ email, magicLink });
+    if (!result.ok) {
+      return `Verifikasi belum berhasil: ${result.message}\n\nKalau link sudah lebih dari 5 menit atau sudah pernah dipakai, kirim ulang emailnya aja ke sini, nanti kubuatkan link baru.`;
+    }
+    const d = result.data;
+    return [
+      "Berhasil! Alight Motion Premium kamu sudah aktif 🎉",
+      "",
+      `- Email: ${d?.email ?? email}`,
+      d?.uid ? `- UID: ${d.uid}` : null,
+      d?.orderId ? `- Order ID: ${d.orderId}` : null,
+      `- Plan: ${d?.plan ?? "Alight Motion Pro"}`,
+      d?.validUntil
+        ? `- Berlaku s/d: ${d.validUntil}`
+        : d?.duration
+          ? `- Durasi: ${d.duration}`
+          : null,
+      "",
+      "Buka aplikasi Alight Motion, lalu login pakai email tadi. Kalau belum berubah, tutup aplikasinya dan buka lagi.",
+    ]
+      .filter((line): line is string => line !== null)
+      .join("\n");
+  }
+
+  // 2) User kirim email -> kirim magic link
+  if (emailInMessage) {
+    const remainder = text.replace(EMAIL_REGEX, "").trim();
+    const looksLikeRequest = remainder.length <= 20 || ACTIVATION_INTENT.test(remainder);
+    if (!looksLikeRequest) return null;
+
+    // Batasi supaya endpoint ini tidak dipakai untuk spam inbox orang lain.
+    if (
+      !checkRateLimit(`ai-send-ip:${clientId}`, 3, 10 * 60 * 1000) ||
+      !checkRateLimit(`ai-send-email:${emailInMessage}`, 1, 60 * 1000)
+    ) {
+      return "Link untuk email itu baru saja dikirim. Tunggu sekitar 1 menit sebelum minta kirim ulang ya.";
+    }
+
+    const result = await performSendMagicLink({ email: emailInMessage });
+    if (!result.ok) {
+      return `Link belum bisa dikirim: ${result.message}`;
+    }
+    return [
+      `Link verifikasi sudah dikirim ke ${emailInMessage}. Sekarang:`,
+      "",
+      "1. Buka Gmail, pastikan loginnya akun yang sama. Cek juga folder Spam.",
+      '2. Cari email dari "noreply@alight-creative.firebaseapp.com".',
+      '3. Tahan tulisan biru "Sign in to Alight Creative" sampai muncul menu, lalu pilih "Salin URL". Jangan diklik langsung.',
+      "4. Balik ke sini dan tempel link-nya di chat ini. Aku yang verifikasi.",
+      "",
+      "Link berlaku 5 menit. Jangan kirim password ke siapa pun, cukup link-nya aja.",
+    ].join("\n");
+  }
+
+  return null;
+}
+
 function buildSystemPrompt(): string {
   const now = new Date();
   const currentTime = now.toLocaleString("id-ID", {
@@ -162,6 +273,9 @@ Website ini adalah layanan GRATIS UNOFFICIAL untuk aktivasi Alight Motion Premiu
 2. Sistem kirim "magic link" (link verifikasi) ke email itu.
 3. User HARUS buka email, cari email masuk, salin link-nya (bukan klik langsung dari app email), lalu tempel link itu ke form verifikasi di website untuk menyelesaikan aktivasi.
 4. Magic link cuma berlaku 5 menit sejak dikirim — kalau kelamaan, harus minta kirim ulang.
+
+[AKTIVASI LEWAT CHAT]
+User juga bisa aktivasi langsung di chat ini: cukup kirim emailnya, sistem otomatis mengirim magic link, lalu user menempelkan link yang sudah disalin ke chat ini dan sistem memverifikasinya. Kalau user bertanya apakah bisa aktivasi lewat chat, jelaskan alur itu singkat dan minta mereka kirim emailnya. JANGAN pernah minta atau terima password email. Kamu sendiri tidak menjalankan aktivasinya, sistem yang menangani otomatis begitu email atau link dikirim.
 
 [PALING SERING BIKIN STUCK — INI FOKUS UTAMA KAMU]
 Bagian yang PALING BANYAK bikin pengguna stuck adalah "abis kirim link, sekarang harus ngapain". Kalau ada yang tanya soal ini (misal: "terus gimana", "gak ada emailnya", "link nya mana", "abis ini apa", "gak connect", "nyari dimana", dsb), jawab dengan LANGKAH INI, PERSIS URUTANNYA, jangan diringkas atau dilewat:
@@ -256,6 +370,9 @@ export const Route = createFileRoute("/api/hidaka-ai")({
           const lastUserMessage =
             validHistory[validHistory.length - 1]?.content.toLowerCase() ?? "";
 
+          const activationReply = await handleActivationChat(validHistory, clientId);
+          if (activationReply) return streamText(activationReply);
+
           const toxicMatches = toxicKeywords.filter((word) => {
             const regex = new RegExp(`\\b${word}\\b`, "i");
             return regex.test(lastUserMessage);
@@ -277,6 +394,8 @@ export const Route = createFileRoute("/api/hidaka-ai")({
             );
           }
 
+          // Magic link tidak boleh ikut terkirim ke penyedia AI.
+          const safeHistory = validHistory.map((m) => ({ ...m, content: redactLinks(m.content) }));
           const systemPrompt = buildSystemPrompt();
 
           const encoder = new TextEncoder();
@@ -285,7 +404,7 @@ export const Route = createFileRoute("/api/hidaka-ai")({
               try {
                 for await (const chunk of streamUnlimitedAI({
                   systemPrompt,
-                  messages: validHistory.slice(-10),
+                  messages: safeHistory.slice(-10),
                 })) {
                   controller.enqueue(encoder.encode(chunk));
                 }
